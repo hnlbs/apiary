@@ -6,6 +6,14 @@ import (
 	"strings"
 )
 
+// ErrorSpec describes a single error response: a status code and an optional
+// custom response schema. When Schema is empty, the shared ErrorResponse schema
+// is used.
+type ErrorSpec struct {
+	Code   int
+	Schema string // optional custom type name, e.g. "ValidationError"
+}
+
 // Operation holds the parsed metadata for a single API operation.
 type Operation struct {
 	Method      string
@@ -13,7 +21,7 @@ type Operation struct {
 	Summary     string
 	Description string
 	Tags        []string
-	Errors      []int
+	Errors      []ErrorSpec
 	// Security lists the scheme names that protect this operation.
 	// A single element "none" means explicitly no security (overrides global).
 	// Nil means "inherit global security".
@@ -68,15 +76,21 @@ func Parse(lines []string) (*Operation, bool) {
 				}
 			}
 		case "errors":
-			for _, code := range strings.Split(value, ",") {
-				code = strings.TrimSpace(code)
-				if code == "" {
+			for _, item := range strings.Split(value, ",") {
+				item = strings.TrimSpace(item)
+				if item == "" {
 					continue
 				}
-				n, err := strconv.Atoi(code)
-				if err == nil {
-					op.Errors = append(op.Errors, n)
+				parts := strings.Fields(item)
+				n, err := strconv.Atoi(parts[0])
+				if err != nil {
+					continue
 				}
+				spec := ErrorSpec{Code: n}
+				if len(parts) > 1 {
+					spec.Schema = parts[1]
+				}
+				op.Errors = append(op.Errors, spec)
 			}
 		case "security":
 			for _, s := range strings.Split(value, ",") {

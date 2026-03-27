@@ -203,7 +203,7 @@ See [testdata/gin/](testdata/gin/) for a full task-manager example.
 ## Error responses
 
 `errors: 400,401,500` adds a response entry for each code. All error responses
-share the `ErrorResponse` schema:
+share the built-in `ErrorResponse` schema by default:
 
 ```yaml
 ErrorResponse:
@@ -214,6 +214,30 @@ ErrorResponse:
       description: Human-readable error message
   required: [error]
 ```
+
+### Custom error schemas
+
+Append a type name after the status code to use a different schema for that
+specific error:
+
+```go
+// apiary:operation POST /api/v1/users
+// summary: Create user
+// errors: 400 ValidationError, 401, 500
+func CreateUser(ctx context.Context, req CreateUserRequest) (UserDTO, error) { ... }
+
+type ValidationError struct {
+    Message string            `json:"message"`
+    Fields  map[string]string `json:"fields" doc:"field name -> error text"`
+}
+```
+
+This generates:
+- `400` → `$ref: '#/components/schemas/ValidationError'`
+- `401`, `500` → `$ref: '#/components/schemas/ErrorResponse'` (default)
+
+Mix and match freely — only the codes that need a custom schema require a type
+name; the rest fall back to `ErrorResponse`.
 
 ---
 

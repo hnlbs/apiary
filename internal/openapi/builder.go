@@ -264,12 +264,17 @@ func (b *Builder) buildOperation(
 		op.Responses["200"] = &Response{Description: "OK"}
 	}
 
-	for _, code := range ann.Errors {
-		op.Responses[strconv.Itoa(code)] = &Response{
-			Description: httpStatusText(code),
+	for _, errSpec := range ann.Errors {
+		schemaRef := "#/components/schemas/ErrorResponse"
+		if errSpec.Schema != "" {
+			sb.BuildSchemaByName(errSpec.Schema)
+			schemaRef = "#/components/schemas/" + errSpec.Schema
+		}
+		op.Responses[strconv.Itoa(errSpec.Code)] = &Response{
+			Description: httpStatusText(errSpec.Code),
 			Content: map[string]*MediaType{
 				"application/json": {
-					Schema: &schema.Schema{Ref: "#/components/schemas/ErrorResponse"},
+					Schema: &schema.Schema{Ref: schemaRef},
 				},
 			},
 		}

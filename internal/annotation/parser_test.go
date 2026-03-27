@@ -37,6 +37,32 @@ func TestParse_Full(t *testing.T) {
 	if len(op.Errors) != 4 {
 		t.Errorf("expected 4 error codes, got %d: %v", len(op.Errors), op.Errors)
 	}
+	if op.Errors[0].Code != 400 {
+		t.Errorf("expected first error code 400, got %d", op.Errors[0].Code)
+	}
+}
+
+func TestParse_ErrorsWithCustomSchema(t *testing.T) {
+	lines := []string{
+		"apiary:operation POST /api/v1/users",
+		"errors: 400 ValidationError, 401, 500",
+	}
+	op, ok := annotation.Parse(lines)
+	if !ok {
+		t.Fatal("expected parse to succeed")
+	}
+	if len(op.Errors) != 3 {
+		t.Fatalf("expected 3 errors, got %d", len(op.Errors))
+	}
+	if op.Errors[0].Code != 400 || op.Errors[0].Schema != "ValidationError" {
+		t.Errorf("expected {400 ValidationError}, got %+v", op.Errors[0])
+	}
+	if op.Errors[1].Code != 401 || op.Errors[1].Schema != "" {
+		t.Errorf("expected {401 }, got %+v", op.Errors[1])
+	}
+	if op.Errors[2].Code != 500 || op.Errors[2].Schema != "" {
+		t.Errorf("expected {500 }, got %+v", op.Errors[2])
+	}
 }
 
 func TestParse_NoMarker(t *testing.T) {
