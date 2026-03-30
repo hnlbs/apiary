@@ -22,16 +22,20 @@ type OperationInfo struct {
 
 // Parser accumulates type definitions and operations from Go source files.
 type Parser struct {
-	fset       *token.FileSet
-	types      map[string]*TypeInfo
-	operations []*OperationInfo
+	fset        *token.FileSet
+	types       map[string]*TypeInfo
+	operations  []*OperationInfo
+	enums       map[string]*EnumInfo
+	typeAliases map[string]string // "Status" → "string"
 }
 
 // New creates a ready-to-use Parser.
 func New() *Parser {
 	return &Parser{
-		fset:  token.NewFileSet(),
-		types: make(map[string]*TypeInfo),
+		fset:        token.NewFileSet(),
+		types:       make(map[string]*TypeInfo),
+		enums:       make(map[string]*EnumInfo),
+		typeAliases: make(map[string]string),
 	}
 }
 
@@ -65,6 +69,11 @@ func (p *Parser) Types() map[string]*TypeInfo {
 	return p.types
 }
 
+// Enums returns all enum types (named types with const values) found so far.
+func (p *Parser) Enums() map[string]*EnumInfo {
+	return p.enums
+}
+
 // parseFile parses a single Go source file.
 func (p *Parser) parseFile(filename string) error {
 	file, err := goparser.ParseFile(p.fset, filename, nil, goparser.ParseComments)
@@ -72,22 +81,28 @@ func (p *Parser) parseFile(filename string) error {
 		return err
 	}
 
-	// First pass: collect all struct type declarations.
+	// First pass: collect struct types and named type aliases.
 	for _, decl := range file.Decls {
 		genDecl, ok := decl.(*ast.GenDecl)
 		if !ok {
 			continue
 		}
-		for _, spec := range genDecl.Specs {
-			typeSpec, ok := spec.(*ast.TypeSpec)
-			if !ok {
-				continue
+		if genDecl.Tok == token.TYPE {
+			for _, spec := range genDecl.Specs {
+				typeSpec, ok := spec.(*ast.TypeSpec)
+				if !ok {
+					continue
+				}
+				if structType, ok := typeSpec.Type.(*ast.StructType); ok {
+					p.types[typeSpec.Name.Name] = parseStructType(typeSpec.Name.Name, structType)
+				} else if ident, ok := typeSpec.Type.(*ast.Ident); ok {
+					// type Status string, type Role int, etc.
+					p.typeAliases[typeSpec.Name.Name] = ident.Name
+				}
 			}
-			structType, ok := typeSpec.Type.(*ast.StructType)
-			if !ok {
-				continue
-			}
-			p.types[typeSpec.Name.Name] = parseStructType(typeSpec.Name.Name, structType)
+		}
+		if genDecl.Tok == token.CONST {
+			p.collectConsts(genDecl)
 		}
 	}
 
@@ -102,6 +117,69 @@ func (p *Parser) parseFile(filename string) error {
 		}
 	}
 	return nil
+}
+
+// collectConsts extracts const values grouped by their named type.
+// Handles both explicit type (`const X Status = "active"`) and iota-inherited
+// type from a const block (`const ( A Status = iota; B; C )`).
+func (p *Parser) collectConsts(decl *ast.GenDecl) {
+	var currentType string
+	for _, spec := range decl.Specs {
+		vs, ok := spec.(*ast.ValueSpec)
+		if !ok {
+			continue
+		}
+		// Explicit type on this line resets the inherited type.
+		if vs.Type != nil {
+			if ident, ok := vs.Type.(*ast.Ident); ok {
+				currentType = ident.Name
+			} else {
+				currentType = ""
+			}
+		}
+		if currentType == "" {
+			continue
+		}
+		baseType, ok := p.typeAliases[currentType]
+		if !ok {
+			continue
+		}
+		for i, nameIdent := range vs.Names {
+			if nameIdent.Name == "_" {
+				continue
+			}
+			val := ""
+			if i < len(vs.Values) {
+				val = constValueLiteral(vs.Values[i])
+			}
+			if val == "" {
+				continue
+			}
+			info := p.enums[currentType]
+			if info == nil {
+				info = &EnumInfo{BaseType: baseType}
+				p.enums[currentType] = info
+			}
+			info.Values = append(info.Values, val)
+		}
+	}
+}
+
+// constValueLiteral extracts the literal value from a const expression.
+func constValueLiteral(expr ast.Expr) string {
+	switch v := expr.(type) {
+	case *ast.BasicLit:
+		s := v.Value
+		// Strip quotes from string literals.
+		if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
+			return s[1 : len(s)-1]
+		}
+		return s
+	case *ast.Ident:
+		// iota or references to other consts — skip for now.
+		return ""
+	}
+	return ""
 }
 
 // parseFunction tries to extract an OperationInfo from a function declaration.

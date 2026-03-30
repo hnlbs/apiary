@@ -38,6 +38,12 @@ type TypeInfo struct {
 	Embedded []string // type names of embedded (anonymous) structs, for allOf
 }
 
+// EnumInfo describes a named Go type with a set of const values.
+type EnumInfo struct {
+	BaseType string   // underlying Go type (e.g. "string", "int")
+	Values   []string // const values in declaration order
+}
+
 // parseTypeExpr converts an AST type expression to a TypeRef.
 func parseTypeExpr(expr ast.Expr) *TypeRef {
 	switch t := expr.(type) {

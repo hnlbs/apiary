@@ -139,11 +139,11 @@ global `security` requirement. Individual operations can override it:
 
 ```go
 // apiary:operation POST /api/v1/auth/login
-// security: none        ← public, no token required
+// security: none        <- public, no token required
 func (h *AuthHandler) Login(...)
 
 // apiary:operation GET /api/v1/admin/report
-// security: bearer      ← explicit (same as global, self-documenting)
+// security: bearer      <- explicit (same as global, self-documenting)
 func (h *AdminHandler) Report(...)
 ```
 
@@ -166,8 +166,8 @@ no type information, request and response types are specified via annotations:
 // apiary:operation POST /api/v1/tasks
 // summary: Create task
 // tags: tasks
-// request: CreateTaskRequest   ← required for gin handlers
-// response: TaskDTO            ← required for gin handlers
+// request: CreateTaskRequest   <- required for gin handlers
+// response: TaskDTO            <- required for gin handlers
 // errors: 400,401,422,500
 func CreateTask(c *gin.Context) {
     var req CreateTaskRequest
@@ -233,8 +233,8 @@ type ValidationError struct {
 ```
 
 This generates:
-- `400` → `$ref: '#/components/schemas/ValidationError'`
-- `401`, `500` → `$ref: '#/components/schemas/ErrorResponse'` (default)
+- `400` -> `$ref: '#/components/schemas/ValidationError'`
+- `401`, `500` -> `$ref: '#/components/schemas/ErrorResponse'` (default)
 
 Mix and match freely — only the codes that need a custom schema require a type
 name; the rest fall back to `ErrorResponse`.
@@ -254,6 +254,43 @@ apiary ./...
 
 If a type cannot be resolved, apiary prints a warning and emits
 `{type: object}` as a placeholder — the YAML is still valid.
+
+---
+
+## Enum support
+
+Apiary automatically detects Go enum patterns — named types with `const` values —
+and adds `enum` to the JSON Schema:
+
+```go
+type ProductCategory string
+
+const (
+    CategoryElectronics ProductCategory = "electronics"
+    CategoryClothing    ProductCategory = "clothing"
+    CategoryFood        ProductCategory = "food"
+)
+
+type ProductDTO struct {
+    Name     string          `json:"name"`
+    Category ProductCategory `json:"category" doc:"Product category"`
+}
+```
+
+This generates:
+
+```yaml
+category:
+    type: string
+    description: Product category
+    enum:
+        - electronics
+        - clothing
+        - food
+```
+
+No extra annotations needed — just standard Go `type` + `const` declarations.
+Works with `string` and integer base types.
 
 ---
 

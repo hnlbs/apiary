@@ -37,7 +37,7 @@ type Operation struct {
 	Summary     string               `yaml:"summary,omitempty"`
 	Description string               `yaml:"description,omitempty"`
 	Tags        []string             `yaml:"tags,omitempty"`
-	Security    interface{}          `yaml:"security,omitempty"` // []SecurityRequirement or []
+	Security    any                  `yaml:"security,omitempty"` // []SecurityRequirement or []
 	Parameters  []Parameter          `yaml:"parameters,omitempty"`
 	RequestBody *RequestBody         `yaml:"requestBody,omitempty"`
 	Responses   map[string]*Response `yaml:"responses"`
@@ -50,7 +50,7 @@ type Parameter struct {
 	Description string         `yaml:"description,omitempty"`
 	Required    bool           `yaml:"required"`
 	Schema      *schema.Schema `yaml:"schema"`
-	Example     interface{}    `yaml:"example,omitempty"`
+	Example     any            `yaml:"example,omitempty"`
 }
 
 // RequestBody describes the body of a request.

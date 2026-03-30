@@ -8,7 +8,7 @@ import (
 )
 
 func TestBuildPrimitiveSchemas(t *testing.T) {
-	b := schema.NewBuilder(nil)
+	b := schema.NewBuilder(nil, nil)
 
 	cases := []struct {
 		typeName   string
@@ -41,7 +41,7 @@ func TestBuildPrimitiveSchemas(t *testing.T) {
 }
 
 func TestBuildSliceSchema(t *testing.T) {
-	b := schema.NewBuilder(nil)
+	b := schema.NewBuilder(nil, nil)
 	ref := &parser.TypeRef{
 		Name:    "array",
 		IsSlice: true,
@@ -57,7 +57,7 @@ func TestBuildSliceSchema(t *testing.T) {
 }
 
 func TestBuildMapSchema(t *testing.T) {
-	b := schema.NewBuilder(nil)
+	b := schema.NewBuilder(nil, nil)
 	ref := &parser.TypeRef{
 		Name:   "map",
 		IsMap:  true,
@@ -87,7 +87,7 @@ func TestBuildStructSchema(t *testing.T) {
 		},
 	}
 
-	b := schema.NewBuilder(types)
+	b := schema.NewBuilder(types, nil)
 	s := b.BuildSchema(&parser.TypeRef{Name: "User"})
 
 	if s.Ref != "#/components/schemas/User" {
@@ -133,7 +133,7 @@ func TestBuildNestedStructSchema(t *testing.T) {
 		},
 	}
 
-	b := schema.NewBuilder(types)
+	b := schema.NewBuilder(types, nil)
 	b.BuildSchema(&parser.TypeRef{Name: "Response"})
 
 	comps := b.Components()
@@ -157,7 +157,7 @@ func TestBuildRecursiveStructNoPanic(t *testing.T) {
 		},
 	}
 
-	b := schema.NewBuilder(types)
+	b := schema.NewBuilder(types, nil)
 	// Must not panic or loop forever.
 	s := b.BuildSchema(&parser.TypeRef{Name: "Node"})
 	if s == nil {
@@ -182,7 +182,7 @@ func TestBuildEmbeddedStructSchema(t *testing.T) {
 		},
 	}
 
-	b := schema.NewBuilder(types)
+	b := schema.NewBuilder(types, nil)
 	b.BuildSchema(&parser.TypeRef{Name: "Extended"})
 
 	comps := b.Components()
@@ -208,7 +208,7 @@ func TestBuildEmbeddedOnlySchema(t *testing.T) {
 		"A":    {Name: "A", Fields: []*parser.FieldInfo{{Name: "X", JSONName: "x", Type: &parser.TypeRef{Name: "string"}}}},
 		"Wrap": {Name: "Wrap", Embedded: []string{"A"}},
 	}
-	b := schema.NewBuilder(types)
+	b := schema.NewBuilder(types, nil)
 	b.BuildSchema(&parser.TypeRef{Name: "Wrap"})
 
 	wrap := b.Components()["Wrap"]
@@ -221,7 +221,7 @@ func TestBuildEmbeddedOnlySchema(t *testing.T) {
 }
 
 func TestExternalTypeMappings(t *testing.T) {
-	b := schema.NewBuilder(nil)
+	b := schema.NewBuilder(nil, nil)
 	cases := []struct{ name, wantType, wantFormat string }{
 		{"uuid.UUID", "string", "uuid"},
 		{"net.IP", "string", "ipv4"},
@@ -244,8 +244,44 @@ func TestExternalTypeMappings(t *testing.T) {
 	}
 }
 
+func TestBuildEnumField(t *testing.T) {
+	types := map[string]*parser.TypeInfo{
+		"Item": {
+			Name: "Item",
+			Fields: []*parser.FieldInfo{
+				{Name: "Status", JSONName: "status", Type: &parser.TypeRef{Name: "ItemStatus"}},
+			},
+		},
+	}
+	enums := map[string]*parser.EnumInfo{
+		"ItemStatus": {BaseType: "string", Values: []string{"active", "archived", "draft"}},
+	}
+
+	b := schema.NewBuilder(types, enums)
+	b.BuildSchema(&parser.TypeRef{Name: "Item"})
+
+	comps := b.Components()
+	item, ok := comps["Item"]
+	if !ok {
+		t.Fatal("Item not in components")
+	}
+	statusProp := item.Properties["status"]
+	if statusProp == nil {
+		t.Fatal("missing 'status' property")
+	}
+	if statusProp.Type != "string" {
+		t.Errorf("expected string type, got %q", statusProp.Type)
+	}
+	if len(statusProp.Enum) != 3 {
+		t.Fatalf("expected 3 enum values, got %d", len(statusProp.Enum))
+	}
+	if statusProp.Enum[0] != "active" || statusProp.Enum[1] != "archived" || statusProp.Enum[2] != "draft" {
+		t.Errorf("unexpected enum values: %v", statusProp.Enum)
+	}
+}
+
 func TestEnsureErrorResponse(t *testing.T) {
-	b := schema.NewBuilder(nil)
+	b := schema.NewBuilder(nil, nil)
 	b.EnsureErrorResponse()
 	comps := b.Components()
 	errSchema, ok := comps["ErrorResponse"]

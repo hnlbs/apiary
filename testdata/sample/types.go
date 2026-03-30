@@ -54,9 +54,19 @@ type UserDTO struct {
 }
 
 type ProductDTO struct {
-	ID          int64   `json:"id"`
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	Price       float64 `json:"price"    example:"1990.00"`
-	InStock     bool    `json:"in_stock"`
+	ID          int64          `json:"id"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Price       float64        `json:"price"    example:"1990.00"`
+	InStock     bool           `json:"in_stock"`
+	Category    ProductCategory `json:"category" doc:"Категория товара"`
 }
+
+type ProductCategory string
+
+const (
+	CategoryElectronics ProductCategory = "electronics"
+	CategoryClothing    ProductCategory = "clothing"
+	CategoryFood        ProductCategory = "food"
+	CategoryBooks       ProductCategory = "books"
+)

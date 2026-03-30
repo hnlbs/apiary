@@ -17,6 +17,7 @@ type Schema struct {
 	Description          string             `yaml:"description,omitempty"`
 	Example              any                `yaml:"example,omitempty"`
 	Default              any                `yaml:"default,omitempty"`
+	Enum                 []any              `yaml:"enum,omitempty"`
 	Properties           map[string]*Schema `yaml:"properties,omitempty"`
 	AdditionalProperties *Schema            `yaml:"additionalProperties,omitempty"`
 	Items                *Schema            `yaml:"items,omitempty"`
@@ -27,15 +28,20 @@ type Schema struct {
 // which schemas have been placed in the components/schemas section.
 type Builder struct {
 	types        map[string]*parser.TypeInfo
+	enums        map[string]*parser.EnumInfo
 	components   map[string]*Schema
 	processing   map[string]bool // guards against recursive types
 	unknownTypes []string        // types not found in the parsed set
 }
 
 // NewBuilder creates a Builder that can resolve the provided types.
-func NewBuilder(types map[string]*parser.TypeInfo) *Builder {
+func NewBuilder(types map[string]*parser.TypeInfo, enums map[string]*parser.EnumInfo) *Builder {
+	if enums == nil {
+		enums = make(map[string]*parser.EnumInfo)
+	}
 	return &Builder{
 		types:      types,
+		enums:      enums,
 		components: make(map[string]*Schema),
 		processing: make(map[string]bool),
 	}
@@ -67,6 +73,12 @@ func (b *Builder) BuildSchema(ref *parser.TypeRef) *Schema {
 	}
 	if s := primitiveSchema(ref.Name); s != nil {
 		return s
+	}
+	// Named enum type — inline the base type schema (with enum values added in buildFieldSchema).
+	if enumInfo, ok := b.enums[ref.Name]; ok {
+		if s := primitiveSchema(enumInfo.BaseType); s != nil {
+			return s
+		}
 	}
 	// Struct type — register in components, return $ref.
 	b.ensureComponent(ref.Name)
@@ -169,9 +181,18 @@ func (b *Builder) ensureComponent(name string) {
 }
 
 func (b *Builder) buildFieldSchema(field *parser.FieldInfo) *Schema {
+	typeName := field.Type.Name
+	if field.Type.IsPtr {
+		typeName = field.Type.Name
+	}
+
+	// Check if the field's type is a named enum type.
+	enumInfo := b.enums[typeName]
+
 	s := b.BuildSchema(field.Type)
-	// Decorate with doc/example/default without mutating a shared primitive schema.
-	if field.Doc != "" || field.Example != "" || field.Default != "" {
+
+	needsCopy := field.Doc != "" || field.Example != "" || field.Default != "" || enumInfo != nil
+	if needsCopy {
 		cp := *s
 		s = &cp
 		if field.Doc != "" {
@@ -182,6 +203,13 @@ func (b *Builder) buildFieldSchema(field *parser.FieldInfo) *Schema {
 		}
 		if field.Default != "" {
 			s.Default = field.Default
+		}
+		if enumInfo != nil {
+			vals := make([]any, len(enumInfo.Values))
+			for i, v := range enumInfo.Values {
+				vals[i] = v
+			}
+			s.Enum = vals
 		}
 	}
 	return s

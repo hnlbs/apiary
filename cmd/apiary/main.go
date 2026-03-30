@@ -62,7 +62,7 @@ func main() {
 			}
 		}
 	}
-	spec, err := builder.Build(ops, p.Types())
+	spec, err := builder.Build(ops, p.Types(), p.Enums())
 	if err != nil {
 		log.Fatalf("apiary: %v", err)
 	}

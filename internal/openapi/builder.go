@@ -61,8 +61,12 @@ func (b *Builder) WithSecurity(scheme string) *Builder {
 	return b
 }
 
-func (b *Builder) Build(operations []*parser.OperationInfo, types map[string]*parser.TypeInfo) (*OpenAPI, error) {
-	sb := schema.NewBuilder(types)
+func (b *Builder) Build(operations []*parser.OperationInfo, types map[string]*parser.TypeInfo, enums ...map[string]*parser.EnumInfo) (*OpenAPI, error) {
+	var enumMap map[string]*parser.EnumInfo
+	if len(enums) > 0 {
+		enumMap = enums[0]
+	}
+	sb := schema.NewBuilder(types, enumMap)
 	sb.EnsureErrorResponse()
 
 	spec := &OpenAPI{

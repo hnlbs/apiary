@@ -341,6 +341,46 @@ type ItemDTO struct {
 	}
 }
 
+func TestParseDir_EnumConsts(t *testing.T) {
+	dir := t.TempDir()
+	code := `package sample
+
+type Status string
+
+const (
+	StatusActive  Status = "active"
+	StatusPending Status = "pending"
+	StatusClosed  Status = "closed"
+)
+
+type Item struct {
+	Name   string ` + "`" + `json:"name"` + "`" + `
+	Status Status ` + "`" + `json:"status"` + "`" + `
+}
+`
+	writeTempFile(t, dir, "enums.go", code)
+
+	p := parser.New()
+	if err := p.ParseDir(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	enums := p.Enums()
+	info, ok := enums["Status"]
+	if !ok {
+		t.Fatal("Status enum not found")
+	}
+	if info.BaseType != "string" {
+		t.Errorf("expected base type string, got %q", info.BaseType)
+	}
+	if len(info.Values) != 3 {
+		t.Fatalf("expected 3 values, got %d: %v", len(info.Values), info.Values)
+	}
+	if info.Values[0] != "active" || info.Values[1] != "pending" || info.Values[2] != "closed" {
+		t.Errorf("unexpected values: %v", info.Values)
+	}
+}
+
 func TestParseDir_MultipleFiles(t *testing.T) {
 	dir := t.TempDir()
 	writeTempFile(t, dir, "handler.go", sampleCode)

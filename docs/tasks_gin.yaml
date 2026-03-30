@@ -51,7 +51,7 @@ paths:
             parameters:
                 - name: Authorization
                   in: header
-                  description: Bearer <токен>
+                  description: Bearer <token>
                   required: true
                   schema:
                     type: string
@@ -440,7 +440,7 @@ components:
                     format: int64
                 description:
                     type: string
-                    example: OOM killer убил сервис около 03:00
+                    example: кафка балуется
                 priority:
                     type: integer
                     format: int32

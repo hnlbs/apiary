@@ -243,6 +243,14 @@ components:
         ProductDTO:
             type: object
             properties:
+                category:
+                    type: string
+                    description: Категория товара
+                    enum:
+                        - electronics
+                        - clothing
+                        - food
+                        - books
                 description:
                     type: string
                 id:
